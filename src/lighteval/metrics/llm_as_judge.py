@@ -78,7 +78,7 @@ class JudgeLM:
         model: str,
         templates: Callable,
         process_judge_response: Callable,
-        judge_backend: Literal["litellm", "openai", "transformers", "tgi", "vllm"],
+        judge_backend: Literal["litellm", "openai", "transformers", "tgi", "vllm", "novita"],
         url: str | None = None,
         api_key: str | None = None,
         response_format: BaseModel = None,
@@ -103,14 +103,15 @@ class JudgeLM:
         match self.backend:
             # Wether we use openai or TGI models, we go through the openai API
             # to route to the endpoint
-            case "openai" | "tgi" if is_openai_available():
+            case "openai" | "tgi" | "novita" if is_openai_available():
                 if self.client is None:
                     from openai import OpenAI
 
                     if self.url is None:
                         self.client = OpenAI(api_key=self.api_key)
                     else:
-                        self.client = OpenAI(base_url=self.url, api_key=self.api_key)
+                        self.client = OpenAI(
+                            base_url=self.url, api_key=self.api_key)
                 return self.__call_api_parallel
             case "litellm" if is_litellm_available():
                 return self.__call_litellm
@@ -119,9 +120,12 @@ class JudgeLM:
                     from vllm import LLM, SamplingParams
                     from vllm.transformers_utils.tokenizer import get_tokenizer
 
-                    self.sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=512)
-                    self.tokenizer = get_tokenizer(self.model, tokenizer_mode="auto")
-                    self.pipe = LLM(model=self.model, max_model_len=2048, gpu_memory_utilization=0.5, dtype="float16")
+                    self.sampling_params = SamplingParams(
+                        temperature=0.8, top_p=0.95, max_tokens=512)
+                    self.tokenizer = get_tokenizer(
+                        self.model, tokenizer_mode="auto")
+                    self.pipe = LLM(model=self.model, max_model_len=2048,
+                                    gpu_memory_utilization=0.5, dtype="float16")
                 return self.__call_vllm
             case "transformers":
                 if self.pipe is None:
@@ -136,11 +140,12 @@ class JudgeLM:
                         "text-generation",
                         model=transformers_model,
                         tokenizer=tokenizer,
-                        max_new_tokens=256,
+                        return_full_text=False,
                     )
                 return self.__call_transformers
             case _:
-                return lambda x: x
+                raise ValueError(
+                    f"Unsupported backend: {self.backend}. Must be one of openai, tgi, novita, litellm, transformers, vllm")
 
     def dict_of_lists_to_list_of_dicts(self, dict_of_lists):
         """
@@ -169,7 +174,8 @@ class JudgeLM:
 
         # Ensure all lists have the same length
         if len(set(list_lengths)) > 1:
-            raise ValueError("All lists in the input dictionary must have the same length")
+            raise ValueError(
+                "All lists in the input dictionary must have the same length")
 
         # Get the length of the lists
         n = list_lengths[0] if list_lengths else 0
@@ -177,7 +183,8 @@ class JudgeLM:
         # Create list of dictionaries
         result = []
         for i in range(n):
-            new_dict = {key: values[i] for key, values in dict_of_lists.items()}
+            new_dict = {key: values[i]
+                        for key, values in dict_of_lists.items()}
             result.append(new_dict)
 
         return result
@@ -202,7 +209,8 @@ class JudgeLM:
             for q, a, o, g, k in zip(questions, answers, options, golds, kwargss)
         ]
         responses = judge_function(prompts)
-        scores = [self.process_judge_response(response) for response in responses]
+        scores = [self.process_judge_response(
+            response) for response in responses]
 
         # clean up the vllm pipeline and free up memory
         if self.pipe is not None and self.backend == "vllm":
@@ -225,7 +233,8 @@ class JudgeLM:
         """
         # lazy loading of the pipeline
         judge_function = self.__lazy_load_client()
-        prompt = self.template(question=question, options=options, answer=answer, gold=gold)
+        prompt = self.template(
+            question=question, options=options, answer=answer, gold=gold)
         response = judge_function(prompt)
         score = self.process_judge_response(response)
 
@@ -238,7 +247,8 @@ class JudgeLM:
 
     def __call_vllm(self, prompt):
         tokenized = [self.tokenizer.apply_chat_template(p) for p in prompt]
-        output = self.pipe.generate(prompt_token_ids=tokenized, sampling_params=self.sampling_params, use_tqdm=True)
+        output = self.pipe.generate(
+            prompt_token_ids=tokenized, sampling_params=self.sampling_params, use_tqdm=True)
         outputs = [output.outputs[0].text for output in output]
         return outputs
 
@@ -269,7 +279,8 @@ class JudgeLM:
                         text = response.choices[0].message.content
                         if not text or text == error_message:
                             # Just return an error response if the second attempt fails too
-                            logger.error(f"Failed to get response from the API for prompt: {prompt}")
+                            logger.error(
+                                f"Failed to get response from the API for prompt: {prompt}")
                             return error_message
                     return text
                 except Exception as e:
@@ -283,7 +294,8 @@ class JudgeLM:
                 results.append(entry)
 
         if None in results:
-            raise ValueError("Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
+            raise ValueError(
+                "Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
 
         return results
 
@@ -294,7 +306,8 @@ class JudgeLM:
                 results.append(entry)
 
         if None in results:
-            raise ValueError("Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
+            raise ValueError(
+                "Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
 
         return results
 
@@ -302,16 +315,29 @@ class JudgeLM:
         for _ in range(self.API_MAX_RETRY):
             try:
                 # Base model
-                response = self.client.beta.chat.completions.parse(
-                    model=self.model,
-                    messages=as_list(prompt),
-                    response_format=self.response_format,
-                    max_tokens=4096,
-                    temperature=0.0,
-                    n=1,
-                )
-                answer = response.choices[0].message.parsed
-                return answer
+                if self.backend == "novita":
+                    # Sử dụng OpenAI SDK với Novita API và DeepSeek v3
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=as_list(prompt),
+                        response_format={"type": "text"},
+                        max_tokens=4096,
+                        temperature=0.0,
+                        n=1,
+                    )
+                    answer = response.choices[0].message.content
+                    return answer
+                else:
+                    response = self.client.beta.chat.completions.parse(
+                        model=self.model,
+                        messages=as_list(prompt),
+                        response_format=self.response_format,
+                        max_tokens=4096,
+                        temperature=0.0,
+                        n=1,
+                    )
+                    answer = response.choices[0].message.parsed
+                    return answer
             except TypeError:
                 try:
                     # Finetune
@@ -320,15 +346,20 @@ class JudgeLM:
                         messages=as_list(prompt),
                         response_format=self.response_format,
                         max_tokens=512,
+                        temperature=0.0,
                         n=1,
                     )
-                    text = response.choices[0].message.content
-                    return text
-                except Exception as e:
-                    logger.warning(f"{type(e), e}")
-                    time.sleep(self.API_RETRY_SLEEP)
+                    return response.choices[0].message.parsed
+                except (TypeError, AttributeError):
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=as_list(prompt),
+                        max_tokens=512,
+                        temperature=0.0,
+                        n=1,
+                    )
+                    return response.choices[0].message.content
             except Exception as e:
-                logger.warning(f"{type(e), e}")
+                logger.warning(f"Error in calling API: {e}")
                 time.sleep(self.API_RETRY_SLEEP)
-
-        raise Exception("Failed to get response from the API")
+        return None

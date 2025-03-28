@@ -67,10 +67,10 @@ llm_judge_mt_bench = SampleLevelMetricGrouping(
     category=MetricCategory.LLM_AS_JUDGE_MULTI_TURN,
     use_case=MetricUseCase.SUMMARIZATION,
     sample_level_fn=JudgeLLMMTBench(
-        judge_model_name="flowaicom/Flow-Judge-v0.1",
+        judge_model_name="deepseek/deepseek-v3-0324",
         template=flow_judge_mt_bench_prompt,
         process_judge_response=process_judge_response,
-        judge_backend="vllm",
+        judge_backend="novita",
     ).compute,
     corpus_level_fn={
         "judge_score_turn_1": np.mean,
@@ -80,7 +80,8 @@ llm_judge_mt_bench = SampleLevelMetricGrouping(
 
 task = LightevalTaskConfig(
     name="mt_bench",
-    prompt_function=mt_bench_prompt,  # must be defined in the file or imported from src/lighteval/tasks/tasks_prompt_formatting.py
+    # must be defined in the file or imported from src/lighteval/tasks/tasks_prompt_formatting.py
+    prompt_function=mt_bench_prompt,
     suite=["extended"],
     hf_repo="lighteval/mt-bench",
     hf_subset="default",

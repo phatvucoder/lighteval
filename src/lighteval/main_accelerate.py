@@ -37,6 +37,7 @@ HELP_PANEL_NAME_1 = "Common Parameters"
 HELP_PANEL_NAME_2 = "Logging Parameters"
 HELP_PANEL_NAME_3 = "Debug Parameters"
 HELP_PANEL_NAME_4 = "Modeling Parameters"
+HELP_PANEL_NAME_5 = "Judge Parameters"
 
 
 def accelerate(  # noqa C901
@@ -50,55 +51,76 @@ def accelerate(  # noqa C901
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     # === Common parameters ===
     use_chat_template: Annotated[
-        bool, Option(help="Use chat template for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        bool, Option(help="Use chat template for evaluation.",
+                     rich_help_panel=HELP_PANEL_NAME_4)
     ] = False,
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     cache_dir: Annotated[
-        Optional[str], Option(help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     load_responses_from_details_date_id: Annotated[
-        Optional[str], Option(help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     override_batch_size: Annotated[
-        int, Option(help="Override batch size for evaluation.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Override batch size for evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = -1,
     job_id: Annotated[
-        int, Option(help="Optional job id for future reference.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future reference.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model (e.g. Novita.ai or OpenAI)", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate models using accelerate and transformers as backend.
@@ -116,10 +138,12 @@ def accelerate(  # noqa C901
     from lighteval.models.transformers.transformers_model import BitsAndBytesConfig, TransformersModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
 
-    accelerator = Accelerator(kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=3000))])
+    accelerator = Accelerator(
+        kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=3000))])
     cache_dir = CACHE_DIR
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir)
+    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir,
+                           judge_api_key=judge_api_key)
 
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
@@ -150,16 +174,19 @@ def accelerate(  # noqa C901
 
         # Creating optional quantization configuration
         if config["base_params"]["dtype"] == "4bit":
-            quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16)
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16)
         elif config["base_params"]["dtype"] == "8bit":
             quantization_config = BitsAndBytesConfig(load_in_8bit=True)
         else:
             quantization_config = None
 
         # We extract the model args
-        args_dict = {k.split("=")[0]: k.split("=")[1] for k in config["base_params"]["model_args"].split(",")}
+        args_dict = {k.split("=")[0]: k.split("=")[1]
+                     for k in config["base_params"]["model_args"].split(",")}
 
-        args_dict["generation_parameters"] = GenerationParameters.from_dict(config)
+        args_dict["generation_parameters"] = GenerationParameters.from_dict(
+            config)
 
         # We store the relevant other args
         args_dict["base_model"] = config["merged_weights"]["base_model"]
@@ -178,21 +205,26 @@ def accelerate(  # noqa C901
 
         if config["merged_weights"].get("delta_weights", False):
             if config["merged_weights"]["base_model"] is None:
-                raise ValueError("You need to specify a base model when using delta weights")
+                raise ValueError(
+                    "You need to specify a base model when using delta weights")
             model_config = DeltaModelConfig(**args_dict)
         elif config["merged_weights"].get("adapter_weights", False):
             if config["merged_weights"]["base_model"] is None:
-                raise ValueError("You need to specify a base model when using adapter weights")
+                raise ValueError(
+                    "You need to specify a base model when using adapter weights")
             model_config = AdapterModelConfig(**args_dict)
         elif config["merged_weights"]["base_model"] not in ["", None]:
-            raise ValueError("You can't specify a base model if you are not using delta/adapter weights")
+            raise ValueError(
+                "You can't specify a base model if you are not using delta/adapter weights")
         else:
             model_config = TransformersModelConfig(**args_dict)
     else:
-        model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
+        model_args_dict: dict = {k.split("=")[0]: k.split(
+            "=")[1] if "=" in k else True for k in model_args.split(",")}
         model_args_dict["accelerator"] = accelerator
         model_args_dict["use_chat_template"] = use_chat_template
-        model_args_dict["compile"] = bool(model_args_dict["compile"]) if "compile" in model_args_dict else False
+        model_args_dict["compile"] = bool(
+            model_args_dict["compile"]) if "compile" in model_args_dict else False
         model_config = TransformersModelConfig(**model_args_dict)
 
     pipeline = Pipeline(

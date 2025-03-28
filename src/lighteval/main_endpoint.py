@@ -20,23 +20,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import os
-from typing import Optional
+from typing import Optional, Literal
 
 import typer
 from typer import Argument, Option
 from typing_extensions import Annotated
 
+from dotenv import load_dotenv
+
+from lighteval.utils import CACHE_DIR
+
+load_dotenv()
 
 app = typer.Typer()
 
-
 TOKEN = os.getenv("HF_TOKEN")
-CACHE_DIR: str = os.getenv("HF_HOME", "/scratch")
 
-HELP_PANEL_NAME_1 = "Common Parameters"
-HELP_PANEL_NAME_2 = "Logging Parameters"
-HELP_PANEL_NAME_3 = "Debug Parameters"
-HELP_PANEL_NAME_4 = "Modeling Parameters"
+HELP_PANEL_NAME_1 = "Common parameters"
+HELP_PANEL_NAME_2 = "Saving"
+HELP_PANEL_NAME_3 = "Debug"
+HELP_PANEL_NAME_4 = "Model parameters"
+HELP_PANEL_NAME_5 = "Judge parameters"
 
 
 @app.command(rich_help_panel="Evaluation Backends")
@@ -51,46 +55,64 @@ def openai(
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     # === Common parameters ===
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     cache_dir: Annotated[
-        str, Option(help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
+        str, Option(help="Cache directory for datasets and models.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = CACHE_DIR,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     job_id: Annotated[
-        int, Option(help="Optional job id for future reference.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future reference.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate OPENAI models.
@@ -104,7 +126,8 @@ def openai(
     else:
         model_config = OpenAIModelConfig(model=model_args)
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir)
+    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir,
+                           judge_api_key=judge_api_key)
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
         save_details=save_details,
@@ -150,7 +173,8 @@ def openai(
 def inference_endpoint(
     # === general ===
     model_config_path: Annotated[
-        str, Argument(help="Path to model config yaml file. (examples/model_configs/endpoint_model.yaml)")
+        str, Argument(
+            help="Path to model config yaml file. (examples/model_configs/endpoint_model.yaml)")
     ],
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     free_endpoint: Annotated[
@@ -162,55 +186,76 @@ def inference_endpoint(
     ] = False,
     # === Common parameters ===
     use_chat_template: Annotated[
-        bool, Option(help="Use chat template for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        bool, Option(help="Use chat template for evaluation.",
+                     rich_help_panel=HELP_PANEL_NAME_4)
     ] = False,
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     cache_dir: Annotated[
-        str, Option(help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
+        str, Option(help="Cache directory for datasets and models.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = CACHE_DIR,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     load_responses_from_details_date_id: Annotated[
-        Optional[str], Option(help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     override_batch_size: Annotated[
-        int, Option(help="Override batch size for evaluation.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Override batch size for evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     job_id: Annotated[
-        int, Option(help="Optional job id for future reference.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future reference.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate models using inference-endpoints as backend.
@@ -219,7 +264,8 @@ def inference_endpoint(
     from lighteval.models.endpoints.endpoint_model import InferenceEndpointModelConfig, ServerlessEndpointModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir)
+    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir,
+                           judge_api_key=judge_api_key)
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
         save_details=save_details,
@@ -231,13 +277,16 @@ def inference_endpoint(
 
     # TODO (nathan): better handling of model_args
 
-    parallelism_manager = ParallelismManager.NONE  # since we're using inference endpoints in remote
+    # since we're using inference endpoints in remote
+    parallelism_manager = ParallelismManager.NONE
 
     # Find a way to add this back
     if free_endpoint:
-        model_config = ServerlessEndpointModelConfig.from_path(model_config_path)
+        model_config = ServerlessEndpointModelConfig.from_path(
+            model_config_path)
     else:
-        model_config = InferenceEndpointModelConfig.from_path(model_config_path)
+        model_config = InferenceEndpointModelConfig.from_path(
+            model_config_path)
 
     pipeline_params = PipelineParameters(
         launcher_type=parallelism_manager,
@@ -274,60 +323,82 @@ def inference_endpoint(
 def tgi(
     # === general ===
     model_config_path: Annotated[
-        str, Argument(help="Path to model config yaml file. (examples/model_configs/tgi_model.yaml)")
+        str, Argument(
+            help="Path to model config yaml file. (examples/model_configs/tgi_model.yaml)")
     ],
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     # === Common parameters ===
     use_chat_template: Annotated[
-        bool, Option(help="Use chat template for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        bool, Option(help="Use chat template for evaluation.",
+                     rich_help_panel=HELP_PANEL_NAME_4)
     ] = False,
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     cache_dir: Annotated[
-        str, Option(help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
+        str, Option(help="Cache directory for datasets and models.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = CACHE_DIR,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     load_responses_from_details_date_id: Annotated[
-        Optional[str], Option(help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     override_batch_size: Annotated[
-        int, Option(help="Override batch size for evaluation.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Override batch size for evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = -1,
     job_id: Annotated[
-        int, Option(help="Optional job id for future reference.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future reference.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate models using TGI as backend.
@@ -336,7 +407,8 @@ def tgi(
     from lighteval.models.endpoints.tgi_model import TGIModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir)
+    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir,
+                           judge_api_key=judge_api_key)
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
         save_details=save_details,
@@ -394,55 +466,76 @@ def litellm(
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     # === Common parameters ===
     use_chat_template: Annotated[
-        bool, Option(help="Use chat template for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        bool, Option(help="Use chat template for evaluation.",
+                     rich_help_panel=HELP_PANEL_NAME_4)
     ] = False,
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     cache_dir: Annotated[
-        str, Option(help="Cache directory for datasets and models.", rich_help_panel=HELP_PANEL_NAME_1)
+        str, Option(help="Cache directory for datasets and models.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = CACHE_DIR,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     load_responses_from_details_date_id: Annotated[
-        Optional[str], Option(help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Load responses from details directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     override_batch_size: Annotated[
-        int, Option(help="Override batch size for evaluation.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Override batch size for evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = -1,
     job_id: Annotated[
-        int, Option(help="Optional job id for future refenrence.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future refenrence.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate models using LiteLLM as backend.
@@ -452,7 +545,8 @@ def litellm(
     from lighteval.models.litellm_model import LiteLLMModelConfig
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir)
+    env_config = EnvConfig(token=TOKEN, cache_dir=cache_dir,
+                           judge_api_key=judge_api_key)
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
         save_details=save_details,
@@ -468,7 +562,8 @@ def litellm(
     if model_args.endswith(".yaml"):
         model_config = LiteLLMModelConfig.from_path(model_args)
     else:
-        model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
+        model_args_dict: dict = {k.split("=")[0]: k.split(
+            "=")[1] if "=" in k else True for k in model_args.split(",")}
         model_config = LiteLLMModelConfig(**model_args_dict)
 
     pipeline_params = PipelineParameters(
@@ -514,43 +609,60 @@ def inference_providers(
     tasks: Annotated[str, Argument(help="Comma-separated list of tasks to evaluate on.")],
     # === Common parameters ===
     system_prompt: Annotated[
-        Optional[str], Option(help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
+        Optional[str], Option(
+            help="Use system prompt for evaluation.", rich_help_panel=HELP_PANEL_NAME_4)
     ] = None,
     dataset_loading_processes: Annotated[
-        int, Option(help="Number of processes to use for dataset loading.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of processes to use for dataset loading.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     custom_tasks: Annotated[
-        Optional[str], Option(help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
+        Optional[str], Option(
+            help="Path to custom tasks directory.", rich_help_panel=HELP_PANEL_NAME_1)
     ] = None,
     num_fewshot_seeds: Annotated[
-        int, Option(help="Number of seeds to use for few-shot evaluation.", rich_help_panel=HELP_PANEL_NAME_1)
+        int, Option(help="Number of seeds to use for few-shot evaluation.",
+                    rich_help_panel=HELP_PANEL_NAME_1)
     ] = 1,
     # === saving ===
     output_dir: Annotated[
-        str, Option(help="Output directory for evaluation results.", rich_help_panel=HELP_PANEL_NAME_2)
+        str, Option(help="Output directory for evaluation results.",
+                    rich_help_panel=HELP_PANEL_NAME_2)
     ] = "results",
     push_to_hub: Annotated[
-        bool, Option(help="Push results to the huggingface hub.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to the huggingface hub.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     push_to_tensorboard: Annotated[
-        bool, Option(help="Push results to tensorboard.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results to tensorboard.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     public_run: Annotated[
-        bool, Option(help="Push results and details to a public repo.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Push results and details to a public repo.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     results_org: Annotated[
-        Optional[str], Option(help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
+        Optional[str], Option(
+            help="Organization to push results to.", rich_help_panel=HELP_PANEL_NAME_2)
     ] = None,
     save_details: Annotated[
-        bool, Option(help="Save detailed, sample per sample, results.", rich_help_panel=HELP_PANEL_NAME_2)
+        bool, Option(help="Save detailed, sample per sample, results.",
+                     rich_help_panel=HELP_PANEL_NAME_2)
     ] = False,
     # === debug ===
     max_samples: Annotated[
-        Optional[int], Option(help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
+        Optional[int], Option(
+            help="Maximum number of samples to evaluate on.", rich_help_panel=HELP_PANEL_NAME_3)
     ] = None,
     job_id: Annotated[
-        int, Option(help="Optional job id for future reference.", rich_help_panel=HELP_PANEL_NAME_3)
+        int, Option(help="Optional job id for future reference.",
+                    rich_help_panel=HELP_PANEL_NAME_3)
     ] = 0,
+    # === judge parameters ===
+    judge_api_key: Annotated[
+        Optional[str], Option(
+            help="API key for the LLM-as-a-judge model", rich_help_panel=HELP_PANEL_NAME_5)
+    ] = None,
 ):
     """
     Evaluate models using LiteLLM as backend.
@@ -562,7 +674,8 @@ def inference_providers(
     )
     from lighteval.pipeline import EnvConfig, ParallelismManager, Pipeline, PipelineParameters
 
-    env_config = EnvConfig(token=TOKEN, cache_dir=CACHE_DIR)
+    env_config = EnvConfig(token=TOKEN, cache_dir=CACHE_DIR,
+                           judge_api_key=judge_api_key)
     evaluation_tracker = EvaluationTracker(
         output_dir=output_dir,
         save_details=save_details,
@@ -578,7 +691,8 @@ def inference_providers(
     if model_args.endswith(".yaml"):
         model_config = InferenceProvidersModelConfig.from_path(model_args)
     else:
-        model_args_dict: dict = {k.split("=")[0]: k.split("=")[1] if "=" in k else True for k in model_args.split(",")}
+        model_args_dict: dict = {k.split("=")[0]: k.split(
+            "=")[1] if "=" in k else True for k in model_args.split(",")}
         model_config = InferenceProvidersModelConfig(**model_args_dict)
 
     pipeline_params = PipelineParameters(

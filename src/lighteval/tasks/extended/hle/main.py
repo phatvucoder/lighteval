@@ -97,22 +97,25 @@ def process_judge_response_hle(response: ExtractedAnswer | List[ExtractedAnswer]
 class JudgeLLMHLE(JudgeLLM):
     def __init__(self):
         super().__init__(
-            judge_model_name="gpt-4o-2024-08-06",
+            judge_model_name="deepseek/deepseek-v3-0324",
             template=get_judge_prompt,
             process_judge_response=process_judge_response_hle,
-            judge_backend="openai",
+            judge_backend="novita",
             short_judge_name="hle_judge",
             response_format=ExtractedAnswer,
         )
 
     def compute(self, sample_ids: list[str], responses: list, formatted_docs: list[Doc]) -> list[dict[str, float]]:
         # If we are evaluating a multiturn task, we need to have specific field in the formatted doc
-        questions = [formatted_doc.specific["question"] for formatted_doc in formatted_docs]
-        golds = [formatted_doc.get_golds()[0] for formatted_doc in formatted_docs]
+        questions = [formatted_doc.specific["question"]
+                     for formatted_doc in formatted_docs]
+        golds = [formatted_doc.get_golds()[0]
+                 for formatted_doc in formatted_docs]
         predictions = [response[0].result[0] for response in responses]
         options = [None] * len(questions)
 
-        score, _, _ = self.judge.evaluate_answer_batch(questions, predictions, options, golds)
+        score, _, _ = self.judge.evaluate_answer_batch(
+            questions, predictions, options, golds)
 
         metrics = []
         for i in range(len(sample_ids)):
@@ -141,12 +144,15 @@ class JudgeLLMHLE(JudgeLLM):
 
         # sometimes model collapses on same questions
         if len(correct) != n:
-            print(f"Available predictions: {len(correct)} | Total questions: {n}")
+            print(
+                f"Available predictions: {len(correct)} | Total questions: {n}")
 
         accuracy = round(100 * sum(correct) / n, 2)
         # Wald estimator, 95% confidence interval
-        confidence_half_width = round(1.96 * math.sqrt(accuracy * (100 - accuracy) / n), 2)
-        calibration_error = round(calib_err(confidence, correct, p="2", beta=100), 2)
+        confidence_half_width = round(
+            1.96 * math.sqrt(accuracy * (100 - accuracy) / n), 2)
+        calibration_error = round(
+            calib_err(confidence, correct, p="2", beta=100), 2)
 
         return {
             "accuracy": accuracy,
@@ -171,15 +177,17 @@ def calib_err(confidence, correct, p="2", beta=100):
     cerr = 0
     total_examples = len(confidence)
     for i in range(len(bins) - 1):
-        bin_confidence = confidence[bins[i][0] : bins[i][1]]
-        bin_correct = correct[bins[i][0] : bins[i][1]]
+        bin_confidence = confidence[bins[i][0]: bins[i][1]]
+        bin_correct = correct[bins[i][0]: bins[i][1]]
         num_examples_in_bin = len(bin_confidence)
 
         if num_examples_in_bin > 0:
-            difference = np.abs(np.nanmean(bin_confidence) - np.nanmean(bin_correct))
+            difference = np.abs(np.nanmean(
+                bin_confidence) - np.nanmean(bin_correct))
 
             if p == "2":
-                cerr += num_examples_in_bin / total_examples * np.square(difference)
+                cerr += num_examples_in_bin / \
+                    total_examples * np.square(difference)
             elif p == "1":
                 cerr += num_examples_in_bin / total_examples * difference
             elif p == "infty" or p == "infinity" or p == "max":
@@ -208,7 +216,8 @@ def hle_text_only(line, task_name: str = None):
 
 hle_metrics = CorpusLevelMetricGrouping(
     metric_name=["accuracy", "confidence_half_width", "calibration_error"],
-    higher_is_better={n: True for n in ["accuracy", "confidence_half_width", "calibration_error"]},
+    higher_is_better={n: True for n in [
+        "accuracy", "confidence_half_width", "calibration_error"]},
     category=MetricCategory.LLM_AS_JUDGE,
     use_case=MetricUseCase.ACCURACY,
     sample_level_fn=JudgeLLMHLE().compute,

@@ -165,7 +165,8 @@ def get_judge_prompt(question: str, answer: str, gold: str, **kwargs):
 def process_judge_response_yourbench(response):
     # extract the final answer using regex from the response xml
     try:
-        answer = re.search(r"<final_answer>(.*?)</final_answer>", response, re.DOTALL).group(1)
+        answer = re.search(r"<final_answer>(.*?)</final_answer>",
+                           response, re.DOTALL).group(1)
         return int(answer)
     except Exception as e:
         logger.error(f"Error processing judge response: {e}")
@@ -175,21 +176,25 @@ def process_judge_response_yourbench(response):
 class JudgeLLMYourBench(JudgeLLM):
     def __init__(self):
         super().__init__(
-            judge_model_name="gpt-4o-2024-08-06",
+            judge_model_name="deepseek/deepseek-v3-0324",
             template=get_judge_prompt,
             process_judge_response=process_judge_response_yourbench,
-            judge_backend="openai",
+            judge_backend="novita",
             short_judge_name="yourbench_judge",
         )
 
     def compute(self, sample_ids: list[str], responses: list, formatted_docs: list[Doc]) -> list[dict[str, float]]:
         # If we are evaluating a multiturn task, we need to have specific field in the formatted doc
-        questions = [formatted_doc.specific["question"] for formatted_doc in formatted_docs]
-        golds = [formatted_doc.get_golds()[0] for formatted_doc in formatted_docs]
+        questions = [formatted_doc.specific["question"]
+                     for formatted_doc in formatted_docs]
+        golds = [formatted_doc.get_golds()[0]
+                 for formatted_doc in formatted_docs]
         predictions = [response[0].result[0] for response in responses]
         options = [None] * len(questions)
-        chunks = [formatted_doc.specific["chunks"][0] for formatted_doc in formatted_docs]
-        documents = [formatted_doc.specific["document"] for formatted_doc in formatted_docs]
+        chunks = [formatted_doc.specific["chunks"][0]
+                  for formatted_doc in formatted_docs]
+        documents = [formatted_doc.specific["document"]
+                     for formatted_doc in formatted_docs]
 
         score, _, _ = self.judge.evaluate_answer_batch(
             questions, predictions, options, golds, chunks=chunks, documents=documents

@@ -113,7 +113,8 @@ class OpenAIClient(LightevalModel):
     def __call_api(self, prompt, return_logits, max_new_tokens, num_samples, logit_bias):
         for _ in range(self.API_MAX_RETRY):
             try:
-                response_format = {"response_format": {"type": "text"}} if "openai" in self.config.base_url else {}
+                response_format = {"response_format": {
+                    "type": "text"}} if "openai" in self.config.base_url else {}
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
@@ -142,24 +143,31 @@ class OpenAIClient(LightevalModel):
     ):
         results = []
 
-        return_logitss = [return_logits for _ in prompts] if not isinstance(return_logits, list) else return_logits
-        max_new_tokenss = [max_new_tokens for _ in prompts] if not isinstance(max_new_tokens, list) else max_new_tokens
-        num_sampless = [num_samples for _ in prompts] if not isinstance(num_samples, list) else num_samples
-        logit_biass = [logit_bias for _ in prompts] if logit_bias is None else logit_bias
+        return_logitss = [return_logits for _ in prompts] if not isinstance(
+            return_logits, list) else return_logits
+        max_new_tokenss = [max_new_tokens for _ in prompts] if not isinstance(
+            max_new_tokens, list) else max_new_tokens
+        num_sampless = [num_samples for _ in prompts] if not isinstance(
+            num_samples, list) else num_samples
+        logit_biass = [
+            logit_bias for _ in prompts] if logit_bias is None else logit_bias
 
         assert (
-            len(prompts) == len(return_logitss) == len(max_new_tokenss) == len(num_sampless) == len(logit_biass)
+            len(prompts) == len(return_logitss) == len(
+                max_new_tokenss) == len(num_sampless) == len(logit_biass)
         ), "Length of prompts, return_logitss, max_new_tokenss, num_sampless, logit_biass should be same"
 
         with ThreadPoolExecutor(self.CONCURENT_CALLS) as executor:
             for entry in tqdm(
-                executor.map(self.__call_api, prompts, return_logitss, max_new_tokenss, num_sampless, logit_biass),
+                executor.map(self.__call_api, prompts, return_logitss,
+                             max_new_tokenss, num_sampless, logit_biass),
                 total=len(prompts),
             ):
                 results.append(entry)
 
         if None in results:
-            raise ValueError("Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
+            raise ValueError(
+                "Some entries are not annotated due to errors in annotate_p, please inspect and retry.")
 
         return results
 
@@ -181,7 +189,8 @@ class OpenAIClient(LightevalModel):
         for request in requests:
             request.tokenized_context = self.tok_encode(request.context)
 
-        dataset = GenerativeTaskDataset(requests=requests, num_dataset_splits=self.DATASET_SPLITS)
+        dataset = GenerativeTaskDataset(
+            requests=requests, num_dataset_splits=self.DATASET_SPLITS)
         results = []
 
         for _ in tqdm(
@@ -196,10 +205,12 @@ class OpenAIClient(LightevalModel):
             num_samples = dataset[0].num_samples
             contexts = [c.context for c in dataset]
 
-            responses = self.__call_api_parallel(contexts, return_logits, max_new_tokens, num_samples)
+            responses = self.__call_api_parallel(
+                contexts, return_logits, max_new_tokens, num_samples)
 
             for response in responses:
-                result: list[str] = [output.message.content for output in response.choices]
+                result: list[str] = [
+                    output.message.content for output in response.choices]
 
                 cur_response = GenerativeResponse(
                     result=result,
@@ -236,7 +247,8 @@ class OpenAIClient(LightevalModel):
         for request in requests:
             if request.context == "":
                 request.tokenized_context = [" "]
-                request.tokenized_continuation = self.tok_encode(request.choice)
+                request.tokenized_continuation = self.tok_encode(
+                    request.choice)
             else:
                 # The following line is mandatory for compatibility with the harness
                 request.tokenized_context, request.tokenized_continuation = self.tok_encode_pair(
@@ -254,14 +266,16 @@ class OpenAIClient(LightevalModel):
         for _ in tqdm(dataset.splits_start_end_iterator()):
             inputs = [dataset[i].context for i in range(len(dataset))]
             logit_biass = []
-            max_new_tokens = [len(dataset[i].tokenized_continuation) for i in range(len(dataset))]
+            max_new_tokens = [len(dataset[i].tokenized_continuation)
+                              for i in range(len(dataset))]
 
             assert all(
                 new_tokens == 1 for new_tokens in max_new_tokens
             ), "Only single token continuations are supported when using openai API."
 
             for i in range(len(dataset)):
-                logit_bias = {tok: 100 for tok in dataset[i].tokenized_continuation}
+                logit_bias = {
+                    tok: 100 for tok in dataset[i].tokenized_continuation}
                 logit_biass.append(logit_bias)
 
             outputs = self.__call_api_parallel(
@@ -269,7 +283,8 @@ class OpenAIClient(LightevalModel):
             )
 
             for output, input in zip(outputs, dataset):
-                continuation_logprobs = [content.logprob for content in output.choices[0].logprobs.content]
+                continuation_logprobs = [
+                    content.logprob for content in output.choices[0].logprobs.content]
                 answer = LoglikelihoodResponse(
                     input_tokens=input.tokenized_context + input.tokenized_continuation,
                     generated_tokens=input.tokenized_continuation,

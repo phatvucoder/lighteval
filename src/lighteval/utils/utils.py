@@ -24,7 +24,8 @@ def flatten_dict(nested: dict, sep="/") -> dict:
     """Flatten dictionary, list, tuple and concatenate nested keys with separator."""
 
     def clean_markdown(v: str) -> str:
-        return v.replace("|", "_").replace("\n", "_") if isinstance(v, str) else v  # Need this for markdown
+        # Need this for markdown
+        return v.replace("|", "_").replace("\n", "_") if isinstance(v, str) else v
 
     def rec(nest: dict, prefix: str, into: dict):
         for k, v in sorted(nest.items()):
@@ -38,9 +39,11 @@ def flatten_dict(nested: dict, sep="/") -> dict:
                         rec(vv, prefix + k + sep + str(i) + sep, into)
                     else:
                         vv = (
-                            vv.replace("|", "_").replace("\n", "_") if isinstance(vv, str) else vv
+                            vv.replace("|", "_").replace(
+                                "\n", "_") if isinstance(vv, str) else vv
                         )  # Need this for markdown
-                        into[prefix + k + sep + str(i)] = vv.tolist() if isinstance(vv, np.ndarray) else vv
+                        into[prefix + k + sep +
+                             str(i)] = vv.tolist() if isinstance(vv, np.ndarray) else vv
             elif isinstance(v, np.ndarray):
                 into[prefix + k + sep + str(i)] = v.tolist()
             else:
@@ -61,7 +64,8 @@ def clean_s3_links(value: str) -> str:
     Returns:
         str : cleaned path
     """
-    s3_bucket, s3_prefix = str(value).replace("s3://", "").split("/", maxsplit=1)
+    s3_bucket, s3_prefix = str(value).replace(
+        "s3://", "").split("/", maxsplit=1)
     if not s3_prefix.endswith("/"):
         s3_prefix += "/"
     link_str = f"https://s3.console.aws.amazon.com/s3/buckets/{s3_bucket}?prefix={s3_prefix}"
@@ -152,7 +156,8 @@ def flatten(item: list[Union[list, str]]) -> list[str]:
     """
     flat_item = []
     for sub_item in item:
-        flat_item.extend(sub_item) if isinstance(sub_item, list) else flat_item.append(sub_item)
+        flat_item.extend(sub_item) if isinstance(
+            sub_item, list) else flat_item.append(sub_item)
     return flat_item
 
 
@@ -190,10 +195,12 @@ class EnvConfig:
     Attributes:
         cache_dir (str): directory for caching data.
         token (str): authentication token used for accessing the HuggingFace Hub.
+        judge_api_key (str): API key for the judge model (e.g. for Novita or OpenAI).
     """
 
     cache_dir: str = os.getenv("HF_HUB_CACHE", "/scratch")
     token: str = os.getenv("HF_TOKEN")
+    judge_api_key: str = None
 
 
 def boolstring_to_bool(x: Union[str, bool, int]) -> Union[bool, None]:
@@ -211,7 +218,8 @@ def boolstring_to_bool(x: Union[str, bool, int]) -> Union[bool, None]:
         return True
     if x in ["False", "false", False, 0]:
         return False
-    raise ValueError(f"You tried to convert {x} to a boolean but it's not possible.")
+    raise ValueError(
+        f"You tried to convert {x} to a boolean but it's not possible.")
 
 
 def download_dataset_worker(

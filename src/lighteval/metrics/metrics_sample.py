@@ -316,7 +316,8 @@ class NormalizedMultiChoiceProbability:
         )
         normalized_probs = np.exp(normalized_log_probs)
 
-        normalized_probs = safe_divide(normalized_probs[gold_ixs], np.sum(normalized_probs))
+        normalized_probs = safe_divide(
+            normalized_probs[gold_ixs], np.sum(normalized_probs))
         gold_idx_agg_prob = self.aggregation_function(normalized_probs)
         return gold_idx_agg_prob
 
@@ -420,8 +421,10 @@ class MRR:
             float: MRR score.
         """
         if self.length_normalization:
-            choices_logprob = [choices_logprob[ix] / len(formatted_doc.choices[ix]) for ix in len(choices_logprob)]
-        ranked_choices = [sorted(choices_logprob, reverse=True).index(choices_logprob[gold]) for gold in gold_ixs]
+            choices_logprob = [
+                choices_logprob[ix] / len(formatted_doc.choices[ix]) for ix in len(choices_logprob)]
+        ranked_choices = [sorted(choices_logprob, reverse=True).index(
+            choices_logprob[gold]) for gold in gold_ixs]
         return 1.0 / (min(ranked_choices) + 1)
 
 
@@ -467,7 +470,8 @@ class ROUGE:
                 default tokenizer will be used.
         """
         if aggregation_function and bootstrap:
-            logger.warning("Can't use both bootstrapping and an aggregation function in Rouge. Keeping bootstrap.")
+            logger.warning(
+                "Can't use both bootstrapping and an aggregation function in Rouge. Keeping bootstrap.")
         self.aggregation_function = aggregation_function
         if self.aggregation_function is None:
             self.aggregation_function = np.mean
@@ -498,7 +502,8 @@ class ROUGE:
         from rouge_score import rouge_scorer
 
         if self.scorer is None:
-            self.scorer = rouge_scorer.RougeScorer(self.methods, tokenizer=self.tokenizer)
+            self.scorer = rouge_scorer.RougeScorer(
+                self.methods, tokenizer=self.tokenizer)
 
         # Normalize
         if self.normalize_gold:
@@ -508,9 +513,11 @@ class ROUGE:
             predictions = [self.normalize_pred(p) for p in predictions]
 
         if self.bootstrap:  # For t5 style rouge score
-            scores = self._rouge_score_with_bootsrap(golds=golds, predictions=predictions)
+            scores = self._rouge_score_with_bootsrap(
+                golds=golds, predictions=predictions)
         elif self.multiple_golds:
-            scores = self._rouge_score_multi_golds(golds=golds, preds=predictions)
+            scores = self._rouge_score_multi_golds(
+                golds=golds, preds=predictions)
         else:
             scores = self._rouge_score(golds=golds, preds=predictions)
 
@@ -586,7 +593,8 @@ class BertScore:
             dict: Scores over the current sample's items.
         """
         if self.bert_scorer is None:
-            logger.warning("The first metric computation step might be a bit longer as we need to download the model.")
+            logger.warning(
+                "The first metric computation step might be a bit longer as we need to download the model.")
             # We only initialize on first compute
             self.bert_scorer = BERTScorer(
                 model_type="microsoft/deberta-large-mnli", lang="en", rescale_with_baseline=True, num_layers=9
@@ -694,7 +702,8 @@ class Faithfulness:
             dict[str, float]: The faithfulness scores.
         """
         if self.summac is None:
-            SummaCZS(granularity="sentence", model_name="vitc", imager_load_cache=False)  # , device=device)
+            SummaCZS(granularity="sentence", model_name="vitc",
+                     imager_load_cache=False)  # , device=device)
         inp = formatted_doc.specific[self.input_column]
         prediction = predictions[0]
         if self.normalize_input:
@@ -715,13 +724,15 @@ class BLEURT:
     @property
     def tokenizer(self):
         if self._tokenizer is None:
-            self._tokenizer = AutoTokenizer.from_pretrained("Elron/bleurt-tiny-512")
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                "Elron/bleurt-tiny-512")
         return self._tokenizer
 
     @property
     def model(self):
         if self._model is None:
-            self._model = AutoModelForSequenceClassification.from_pretrained("Elron/bleurt-tiny-512")
+            self._model = AutoModelForSequenceClassification.from_pretrained(
+                "Elron/bleurt-tiny-512")
             self._model.eval()
         return self._model
 
@@ -737,7 +748,8 @@ class BLEURT:
         """
         if len(predictions) == 1:
             predictions = predictions * len(golds)
-        scores = self.model(**self.tokenizer(golds, predictions, return_tensors="pt"))[0].squeeze()
+        scores = self.model(
+            **self.tokenizer(golds, predictions, return_tensors="pt"))[0].squeeze()
         return scores.item()
 
 
@@ -789,7 +801,8 @@ class StringDistance:
             metric_types (list[str] | str): Can be one or any of `longest_common_prefix_length`, `edit_distance` or `edit_similarity`.
             strip_prediction (bool, optional): Whether to strip the prediction. Defaults to True.
         """
-        allowed_values = ["longest_common_prefix_length", "edit_distance", "edit_similarity"]
+        allowed_values = ["longest_common_prefix_length",
+                          "edit_distance", "edit_similarity"]
         metric_types = as_list(metric_types)
         if any(metric_type not in allowed_values for metric_type in metric_types):
             raise ValueError(
@@ -797,7 +810,8 @@ class StringDistance:
             )
         self.metric_types = metric_types
         self.strip_prediction = strip_prediction
-        self.sample_aggregations = {"longest_common_prefix_length": max, "edit_distance": min, "edit_similarity": max}
+        self.sample_aggregations = {
+            "longest_common_prefix_length": max, "edit_distance": min, "edit_similarity": max}
 
     def compute(self, golds: list[str], predictions: list[str], **kwargs) -> dict:
         """Computes all the requested metrics on the golds and prediction.
@@ -824,18 +838,23 @@ class StringDistance:
             # Truncate it here to be of the same length as the completion to ensure edit-distance is meaningful.
             truncated_reference = reference[: len(completion)]
 
-            completion_tokens = np.array(TreebankWordTokenizer().tokenize(completion))
-            truncated_reference_tokens = np.array(TreebankWordTokenizer().tokenize(truncated_reference))
+            completion_tokens = np.array(
+                TreebankWordTokenizer().tokenize(completion))
+            truncated_reference_tokens = np.array(
+                TreebankWordTokenizer().tokenize(truncated_reference))
 
             if "edit_distance" in self.metric_types:
-                result["edit_distance"].append(edit_distance(s1=completion_tokens, s2=truncated_reference_tokens))
+                result["edit_distance"].append(edit_distance(
+                    s1=completion_tokens, s2=truncated_reference_tokens))
             if "edit_similarity" in self.metric_types:
                 result["edit_similarity"].append(
-                    self.edit_similarity(s1=completion_tokens, s2=truncated_reference_tokens)
+                    self.edit_similarity(
+                        s1=completion_tokens, s2=truncated_reference_tokens)
                 )
             if "longest_common_prefix_length" in self.metric_types:
                 result["longest_common_prefix_length"].append(
-                    self.longest_common_prefix_length(s1=completion_tokens, s2=truncated_reference_tokens)
+                    self.longest_common_prefix_length(
+                        s1=completion_tokens, s2=truncated_reference_tokens)
                 )
 
         final_result = {}
@@ -865,39 +884,55 @@ class StringDistance:
 
 
 class JudgeLLM:
-    available_models_openai = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-4o-2024-08-06"]
+    available_models_openai = ["gpt-3.5-turbo", "gpt-4o",
+                               "gpt-4-turbo", "gpt-4", "gpt-4o-2024-08-06"]
+    available_models_novita = ["deepseek/deepseek-v3-0324"]
 
     def __init__(
         self,
         judge_model_name: str,
         template: Callable,
         process_judge_response: Callable,
-        judge_backend: Literal["litellm", "openai", "transformers", "vllm", "tgi"],
+        judge_backend: Literal["litellm", "openai", "transformers", "vllm", "tgi", "novita"],
         short_judge_name: str | None = None,
         response_format: BaseModel = None,
+        judge_api_key: str | None = None,
     ) -> None:
         match judge_backend:
             case "openai":
                 if judge_model_name not in self.available_models_openai:
-                    raise ValueError(f"{judge_model_name} not in available models for llm as a judge metric")
+                    raise ValueError(
+                        f"{judge_model_name} not in available models for llm as a judge metric")
                 else:
-                    api_key = os.getenv("OPENAI_API_KEY")
+                    api_key = judge_api_key if judge_api_key else os.getenv(
+                        "OPENAI_API_KEY")
                     url = None
+            case "novita":
+                if judge_model_name not in self.available_models_novita:
+                    raise ValueError(
+                        f"{judge_model_name} not in available models for novita llm as a judge metric")
+                else:
+                    api_key = judge_api_key if judge_api_key else os.getenv(
+                        "NOVITA_API_KEY")
+                    url = "https://api.novita.ai/v3/openai"
             case "tgi":
-                api_key = os.getenv("HF_TOKEN")
+                api_key = judge_api_key if judge_api_key else os.getenv(
+                    "HF_TOKEN")
                 url = "https://api-inference.huggingface.co/v1/"
             case "litellm":
-                api_key = None
+                api_key = judge_api_key if judge_api_key else None
                 url = None
             case "transformers" | "vllm":
                 api = HfApi()
                 models = api.list_models(model_name=judge_model_name)
                 url = None
-                api_key = None
+                api_key = judge_api_key if judge_api_key else None
                 if not models:
-                    raise ValueError(f"{judge_model_name} not in available models for llm as a judge metric")
+                    raise ValueError(
+                        f"{judge_model_name} not in available models for llm as a judge metric")
             case _:
-                raise ValueError(f"{judge_backend} is not a valid backend for llm as a judge metric")
+                raise ValueError(
+                    f"{judge_backend} is not a valid backend for llm as a judge metric")
 
         self.short_judge_name = short_judge_name
         self.judge = JudgeLM(
@@ -911,7 +946,8 @@ class JudgeLLM:
         )
 
     def compute(self, predictions: list[str], formatted_doc: Doc, **kwargs) -> dict[str, float]:
-        raise NotImplementedError("This method should be implemented in the subclass.")
+        raise NotImplementedError(
+            "This method should be implemented in the subclass.")
 
 
 class JudgeLLMMTBench(JudgeLLM):
@@ -954,12 +990,15 @@ class JudgeLLMMixEval(JudgeLLM):
         return scores for turn 1 and 2. Also returns user_prompt and judgement
         which are ignored later by the aggregator.
         """
-        questions = [formatted_doc.specific["question"] for formatted_doc in formatted_docs]
+        questions = [formatted_doc.specific["question"]
+                     for formatted_doc in formatted_docs]
         options = [formatted_doc.choices for formatted_doc in formatted_docs]
-        golds = [formatted_doc.get_golds()[0] for formatted_doc in formatted_docs]
+        golds = [formatted_doc.get_golds()[0]
+                 for formatted_doc in formatted_docs]
         predictions = [response[0].result[0] for response in responses]
 
-        scores, messages, judgements = self.judge.evaluate_answer_batch(questions, predictions, options, golds)
+        scores, messages, judgements = self.judge.evaluate_answer_batch(
+            questions, predictions, options, golds)
 
         metrics = []
         for i in range(len(sample_ids)):
@@ -1068,7 +1107,8 @@ class PassAtK:
         normalize_gold: Callable = None,
         normalize_pred: Callable = None,
         strip_strings: bool = False,
-        sample_scoring_function: Union[Callable[[str, str], float], str] = None,
+        sample_scoring_function: Union[Callable[[
+            str, str], float], str] = None,
     ):
         """Computing pass at k
 
@@ -1125,9 +1165,11 @@ class PassAtK:
 
         if self.n is None:
             self.n = len(predictions)
-            logger.warning("n undefined in the pass@k. We assume it's the same as the sample's number of predictions.")
+            logger.warning(
+                "n undefined in the pass@k. We assume it's the same as the sample's number of predictions.")
         elif len(predictions) < self.n:
-            logger.warning(f"Number of predictions is less than {self.n} for pass@k.")
+            logger.warning(
+                f"Number of predictions is less than {self.n} for pass@k.")
 
         gold = self.get_processed_gold(golds[0])
 
